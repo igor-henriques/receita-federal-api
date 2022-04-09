@@ -4,6 +4,7 @@ public class ChromeDriverFactory
 {
     public ChromeDriver GetChromeDriver()
     {
+        string userDataDir = Environment.GetEnvironmentVariable("USER_DATA_DIR");
         string driverPath = Environment.GetEnvironmentVariable("CHROMEDRIVER_PATH");
 
         ChromeDriverService driverService = driverPath is null ? ChromeDriverService.CreateDefaultService() : ChromeDriverService.CreateDefaultService(driverPath);
@@ -29,8 +30,15 @@ public class ChromeDriverFactory
             "--disable-session-crashed-bubble",
             "--disable-ipv6",
             "--allow-http-screen-capture",
-            "--start-minimized"
+            "--start-minimized",
+            "--remote-debugging-port=9001"
         });
+
+        if (!string.IsNullOrEmpty(userDataDir))
+            options.AddArgument($"user-data-dir={userDataDir}");
+
+        options.AddExcludedArgument("enable-automation");
+        options.AddAdditionalOption("useAutomationExtension", false);
 
         options.BinaryLocation = Environment.GetEnvironmentVariable("GOOGLE_CHROME_BIN");
         options.AddExtension(Path.Combine(Directory.GetCurrentDirectory(), "hcaptcha-solver.crx"));
