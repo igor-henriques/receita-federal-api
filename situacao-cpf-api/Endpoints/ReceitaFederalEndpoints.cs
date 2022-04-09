@@ -15,11 +15,11 @@ public static class ReceitaFederalEndpoints
             if (validationResponse.Any())
                 return Results.BadRequest(string.Join("\n", validationResponse));
 
-            RequestQueueController.RequestsQueue.Enqueue(new(cpf, DateTime.Parse(dtNascimento)));
-
-            await TaskUtils.WaitWhile(() => RequestQueueController.Busy);
-
-            SituacaoCadastralResponse situacaoCadastral = await receitaService.ObterSituacaoCadastral(RequestQueueController.RequestsQueue.Dequeue());
+            SituacaoCadastralRequest request = new(cpf, DateTime.Parse(dtNascimento));
+            
+            SituacaoCadastralResponse situacaoCadastral = await Attempt.RunAsync(
+                function: () => receitaService.ObterSituacaoCadastral(request), 
+                attempts: 3);
 
             return situacaoCadastral is null or default(SituacaoCadastralResponse) ? Results.StatusCode(499) : Results.Ok(situacaoCadastral);
         });

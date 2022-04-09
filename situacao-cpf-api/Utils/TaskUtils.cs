@@ -12,13 +12,17 @@ public class TaskUtils
     /// <returns></returns>
     public static async Task WaitWhile(Func<bool> condition, int frequency = 25, int timeout = -1)
     {
-        var waitTask = Task.Run(async () =>
+        try
         {
-            while (condition()) await Task.Delay(frequency);
-        });
+            var waitTask = Task.Run(async () =>
+            {
+                while (condition()) await Task.Delay(frequency);
+            });
 
-        if (waitTask != await Task.WhenAny(waitTask, Task.Delay(timeout)))
-            throw new TimeoutException();
+            if (waitTask != await Task.WhenAny(waitTask, Task.Delay(timeout)))
+                throw new TimeoutException();
+        }
+        catch (Exception ex) { if (ex.GetType() == typeof(TimeoutException)) throw; }
     }
 
     /// <summary>

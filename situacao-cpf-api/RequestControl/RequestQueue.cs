@@ -1,6 +1,6 @@
 ﻿namespace situacao_cpf_api.RequestControl;
 
-public class RequestQueueController
+public class RequestQueue
 {
     public static bool Busy = false;
 

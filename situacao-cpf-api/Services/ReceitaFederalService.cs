@@ -1,71 +1,64 @@
 ﻿namespace situacao_cpf_api.Services;
 
-public class ReceitaFederalService : IReceitaFederalService, IDisposable
+public class ReceitaFederalService : IReceitaFederalService
 {
     private IWebRepository webContext;
     private readonly ILogger<ReceitaFederalService> logger;
     private readonly WebRepositoryFactory webContextFactory;
-    private SituacaoCadastralRequest bakRequest;
     private Timer timeoutController;
 
     public ReceitaFederalService(ILogger<ReceitaFederalService> logger, IWebRepository webContext, WebRepositoryFactory webContextFactory)
     {
         this.webContext = webContext;
         this.webContextFactory = webContextFactory;
-        this.timeoutController = new Timer(async (obj) => await TimeoutSafetyVerifier(), null, 12_000, Timeout.Infinite);
         this.logger = logger;
     }
 
-    private async Task TimeoutSafetyVerifier()
+    private void TimeoutSafetyVerifier()
     {
-        webContext?.DisposeDriver();
-
-        webContext = null;
-
         CleanDriverGarbage.Run();
 
-        await ObterSituacaoCadastral(bakRequest);
+        webContext.DisposeDriver();
+
+        webContext = null;
     }
 
     public async ValueTask<SituacaoCadastralResponse> ObterSituacaoCadastral(SituacaoCadastralRequest request)
     {
-        RequestQueueController.Busy = true;
-
-        PrepareProperties(request);
-
         try
         {
+            this.timeoutController = new Timer((obj) => TimeoutSafetyVerifier(), null, 15_000, Timeout.Infinite);
+
+            webContext = webContext ?? webContextFactory.GetWebRepository();
+
             await CompleteFields(request);
 
             await ResolveCaptcha();
 
-            await ClickSubmit(request);
+            await ClickSubmit();
 
             WaitForResultPageLoad();
+
+            var response = await ObterDados();
+
+            webContext.DisposeDriver();
+
+            return response;
         }
         catch (Exception ex)
         {
             logger.LogCritical(ex.ToString());
 
-            await TimeoutSafetyVerifier();
+            throw;
         }
-
-        return await ObterDados();
-    }
-
-    private void PrepareProperties(SituacaoCadastralRequest request)
-    {
-        this.bakRequest = request;        
-
-        webContext = webContext ?? webContextFactory.GetWebRepository();
     }
 
     private async Task CompleteFields(SituacaoCadastralRequest request)
     {
         if (!webContext.GetCurrentURL().Equals(ReceitaFederalElements.ReceitaFederalURL))
-            webContext.Navigate(ReceitaFederalElements.ReceitaFederalURL);
+            webContext?.Navigate(ReceitaFederalElements.ReceitaFederalURL);
         else
-            webContext.RefreshPage();
+            webContext?.RefreshPage();
 
         await webContext.InsertTextOnElement(By.XPath(ReceitaFederalElements.CpfTextbox), request.CPF!);
 
@@ -78,20 +71,25 @@ public class ReceitaFederalService : IReceitaFederalService, IDisposable
 
         await TaskUtils.WaitWhile(() => webContext.GetElement(By.Id(ReceitaFederalElements.IdCheckbox), false).Result.GetAttribute("aria-checked") == "false");
 
-        webContext.SwitchToDefault();
+        webContext?.SwitchToDefault();
     }
 
-    private async Task ClickSubmit(SituacaoCadastralRequest request)
+    private async Task ClickSubmit()
     {
-        await webContext.ClickOnElement(By.XPath(ReceitaFederalElements.SubmitButton));
-
-        if (webContext.ElementExists(By.XPath(ReceitaFederalElements.ValidacaoErrorMessage)))
-            await ObterSituacaoCadastral(request);
+        try
+        {
+            await webContext.ClickOnElement(By.XPath(ReceitaFederalElements.SubmitButton));
+        }
+        catch (Exception e) { logger.LogCritical(e.ToString()); }
     }
 
     private void WaitForResultPageLoad()
     {
-        webContext.WaitUntilElementIsVisible(By.Id(ReceitaFederalElements.IdTituloPortal));
+        try
+        {
+            webContext.WaitUntilElementIsVisible(By.Id(ReceitaFederalElements.IdTituloPortal));
+        }
+        catch (Exception e) { logger.LogCritical(e.ToString()); }
     }
 
     private async ValueTask<bool> IsDataWrong()
@@ -102,8 +100,10 @@ public class ReceitaFederalService : IReceitaFederalService, IDisposable
 
             return !string.IsNullOrEmpty(errorContent);
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogCritical(ex.ToString());
+
             return false;
         }
     }
@@ -137,10 +137,5 @@ public class ReceitaFederalService : IReceitaFederalService, IDisposable
         await timeoutController.DisposeAsync();
 
         return response;
-    }
-
-    public void Dispose()
-    {        
-        RequestQueueController.Busy = false;
     }
 }
