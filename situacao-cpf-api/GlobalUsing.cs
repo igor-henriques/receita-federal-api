@@ -17,3 +17,4 @@ global using situacao_cpf_api.Middlewares;
 global using SeleniumExtras.WaitHelpers;
 global using situacao_cpf_api.Models.Response;
 global using situacao_cpf_api.Models.Request;
+global using situacao_cpf_api.RequestControl;

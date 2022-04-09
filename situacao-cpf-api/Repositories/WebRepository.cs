@@ -10,6 +10,8 @@ public class WebRepository : IWebRepository, IDisposable
     {
         this._driver = driverFactory.GetChromeDriver();
 
+        this._driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(7);
+
         this._wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(7));
 
         this._wait.IgnoreExceptionTypes(typeof(NoSuchElementException), typeof(ElementNotVisibleException));
@@ -18,11 +20,6 @@ public class WebRepository : IWebRepository, IDisposable
     public void Navigate(string URL)
     {
         _driver.Navigate().GoToUrl(URL);
-    }
-
-    public void Refresh()
-    {
-        _driver.Navigate().Refresh();
     }
 
     public async ValueTask<IWebElement> GetElement(By elementLocator, bool verifyExistence = true)
@@ -143,7 +140,7 @@ public class WebRepository : IWebRepository, IDisposable
 
     public void Dispose()
     {
-        GC.SuppressFinalize(this);
+        _driver?.Dispose();
     }
 
     public void WaitUntilElementIsVisible(By elementLocator)
@@ -153,5 +150,15 @@ public class WebRepository : IWebRepository, IDisposable
             _wait.Until(ExpectedConditions.ElementIsVisible(elementLocator));
         }
         catch { }
+    }
+
+    public void DisposeDriver()
+    {        
+        _driver?.Dispose();
+    }
+
+    public bool IsDisposed()
+    {
+        return string.IsNullOrEmpty(_driver?.Title);
     }
 }

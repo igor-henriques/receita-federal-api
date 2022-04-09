@@ -12,7 +12,7 @@ public class ValidateChamadaReceitaFederal
         if (!IsCpf(cpf))
             Errors.Add("CPF inválido");
 
-        if (token != "AeC")
+        if (!token.Equals("6_BE@22M>ckyds(`3m5QuBD}*DX{=*7$uFKYV%Fm"))
             Errors.Add("Token inválido");
 
         return Errors;

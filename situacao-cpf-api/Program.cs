@@ -6,10 +6,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
 builder.Services.AddSingleton<ChromeDriverFactory>();
+builder.Services.AddSingleton<WebRepositoryFactory>();
+builder.Services.AddScoped<IWebRepository, WebRepository>();
 builder.Services.AddScoped<IReceitaFederalService, ReceitaFederalService>();
-builder.Services.AddSingleton<IWebRepository, WebRepository>();
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionHandlerMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -20,8 +23,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors(x => x.AllowAnyHeader()
                   .AllowAnyOrigin()
                   .AllowAnyMethod());
-
-app.UseMiddleware<ExceptionHandlerMiddleware>();
 
 app.UseHttpsRedirection();
 

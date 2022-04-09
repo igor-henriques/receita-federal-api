@@ -15,8 +15,9 @@ public interface IWebRepository : IDisposable
     bool ElementExists(By elementLocator);
     void WaitUntilElementIsVisible(By elementLocator);
     ValueTask<IWebElement> GetLastEvent(By classEventTab);
-    void Refresh();
     T RunJavascript<T>(string script);
     ValueTask SwitchToFrame(By frame);
     void SwitchToDefault();
+    void DisposeDriver();
+    bool IsDisposed();
 }

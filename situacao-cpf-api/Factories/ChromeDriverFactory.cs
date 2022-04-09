@@ -30,14 +30,15 @@ public class ChromeDriverFactory
             "--disable-session-crashed-bubble",
             "--disable-ipv6",
             "--allow-http-screen-capture",
-            "--start-minimized",
-            "--remote-debugging-port=9001"
+            "--start-minimized"
         });
 
         if (!string.IsNullOrEmpty(userDataDir))
             options.AddArgument($"user-data-dir={userDataDir}");
 
         options.AddExcludedArgument("enable-automation");
+        options.AddExcludedArgument("--headless");
+
         options.AddAdditionalOption("useAutomationExtension", false);
 
         options.BinaryLocation = Environment.GetEnvironmentVariable("GOOGLE_CHROME_BIN");

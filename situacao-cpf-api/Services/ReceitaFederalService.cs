@@ -1,39 +1,37 @@
 ﻿namespace situacao_cpf_api.Services;
 
-public class ReceitaFederalService : IReceitaFederalService
+public class ReceitaFederalService : IReceitaFederalService, IDisposable
 {
-    private readonly IWebRepository webContext;
-
-    private readonly Timer timeoutController;
-    private bool timeoutControllerFlag = false;
-
+    private IWebRepository webContext;
+    private readonly ILogger<ReceitaFederalService> logger;
+    private readonly WebRepositoryFactory webContextFactory;
     private SituacaoCadastralRequest bakRequest;
+    private Timer timeoutController;
 
-    public ReceitaFederalService(IWebRepository webContext)
+    public ReceitaFederalService(ILogger<ReceitaFederalService> logger, IWebRepository webContext, WebRepositoryFactory webContextFactory)
     {
         this.webContext = webContext;
-        this.timeoutController = new Timer(async (obj) => await TimeoutSafetyVerifier(), null, 10_000, 10_000);
+        this.webContextFactory = webContextFactory;
+        this.timeoutController = new Timer(async (obj) => await TimeoutSafetyVerifier(), null, 12_000, Timeout.Infinite);
+        this.logger = logger;
     }
 
     private async Task TimeoutSafetyVerifier()
     {
-        try
-        {
-            if (!timeoutControllerFlag)
-            {
-                timeoutControllerFlag = true;
+        webContext?.DisposeDriver();
 
-                await ObterSituacaoCadastral(bakRequest);
+        webContext = null;
 
-                timeoutControllerFlag = false;
-            }                            
-        }
-        catch { }
+        CleanDriverGarbage.Run();
+
+        await ObterSituacaoCadastral(bakRequest);
     }
 
     public async ValueTask<SituacaoCadastralResponse> ObterSituacaoCadastral(SituacaoCadastralRequest request)
     {
-        this.bakRequest = request;
+        RequestQueueController.Busy = true;
+
+        PrepareProperties(request);
 
         try
         {
@@ -43,37 +41,42 @@ public class ReceitaFederalService : IReceitaFederalService
 
             await ClickSubmit(request);
 
-            await WaitForResultPageLoad();
+            WaitForResultPageLoad();
         }
-        catch
+        catch (Exception ex)
         {
-            await ObterSituacaoCadastral(request);
+            logger.LogCritical(ex.ToString());
+
+            await TimeoutSafetyVerifier();
         }
 
         return await ObterDados();
     }
 
+    private void PrepareProperties(SituacaoCadastralRequest request)
+    {
+        this.bakRequest = request;        
+
+        webContext = webContext ?? webContextFactory.GetWebRepository();
+    }
+
     private async Task CompleteFields(SituacaoCadastralRequest request)
     {
-        try
-        {
+        if (!webContext.GetCurrentURL().Equals(ReceitaFederalElements.ReceitaFederalURL))
             webContext.Navigate(ReceitaFederalElements.ReceitaFederalURL);
+        else
+            webContext.RefreshPage();
 
-            await webContext.InsertTextOnElement(By.XPath(ReceitaFederalElements.CpfTextbox), request.CPF!);
+        await webContext.InsertTextOnElement(By.XPath(ReceitaFederalElements.CpfTextbox), request.CPF!);
 
-            await webContext.InsertTextOnElement(By.XPath(ReceitaFederalElements.DtNascimentoTextbox), request.DtNascimento!.Date.ToShortDateString());
-        }
-        catch
-        {
-            await ObterSituacaoCadastral(request);
-        }
+        await webContext.InsertTextOnElement(By.XPath(ReceitaFederalElements.DtNascimentoTextbox), request.DtNascimento!.Date.ToShortDateString());
     }
 
     private async Task ResolveCaptcha()
     {
-        await webContext.SwitchToFrame(By.XPath("//*[@id=\"hcaptcha\"]/iframe"));
+        await webContext.SwitchToFrame(By.XPath(ReceitaFederalElements.CaptchaFrame));
 
-        await TaskUtils.WaitWhile(() => webContext.GetElement(By.Id("checkbox"), false).Result.GetAttribute("aria-checked") == "false");
+        await TaskUtils.WaitWhile(() => webContext.GetElement(By.Id(ReceitaFederalElements.IdCheckbox), false).Result.GetAttribute("aria-checked") == "false");
 
         webContext.SwitchToDefault();
     }
@@ -86,16 +89,16 @@ public class ReceitaFederalService : IReceitaFederalService
             await ObterSituacaoCadastral(request);
     }
 
-    private async ValueTask WaitForResultPageLoad()
+    private void WaitForResultPageLoad()
     {
-        await Task.Run(() => webContext.WaitUntilElementIsVisible(By.Id("portal-title")));
+        webContext.WaitUntilElementIsVisible(By.Id(ReceitaFederalElements.IdTituloPortal));
     }
 
     private async ValueTask<bool> IsDataWrong()
     {
         try
         {
-            var errorContent = await webContext.GetElementContent(By.XPath("/html/body/div[2]/div[2]/div[1]/div/div/div/div/div[1]/span/h4"), false);
+            var errorContent = await webContext.GetElementContent(By.XPath(ReceitaFederalElements.XPathMensagemErro), false);
 
             return !string.IsNullOrEmpty(errorContent);
         }
@@ -109,16 +112,18 @@ public class ReceitaFederalService : IReceitaFederalService
     {
         if (await IsDataWrong())
         {
+            await timeoutController.DisposeAsync();
+
             throw new ArgumentException("'CPF' e/ou 'data de nascimento' incorretos");
         }
 
         SituacaoCadastralResponse response = new();
 
-        var painelConteudos = await webContext.GetElements(By.ClassName("clConteudoEsquerda"));
+        var painelConteudos = await webContext.GetElements(By.ClassName(ReceitaFederalElements.ClassePainelConteudo));
 
-        var painelDados = painelConteudos.FirstOrDefault().FindElements(By.ClassName("clConteudoDados"));
+        var painelDados = painelConteudos.FirstOrDefault().FindElements(By.ClassName(ReceitaFederalElements.ClassePainelDados));
 
-        var painelComprovante = painelConteudos.LastOrDefault().FindElements(By.ClassName("clConteudoComp"));
+        var painelComprovante = painelConteudos.LastOrDefault().FindElements(By.ClassName(ReceitaFederalElements.ClassePainelComprovantes));
 
         response.CPF = painelDados.ElementAt(0).FindElement(By.TagName("b")).Text;
         response.Nome = painelDados.ElementAt(1).FindElement(By.TagName("b")).Text;
@@ -132,5 +137,10 @@ public class ReceitaFederalService : IReceitaFederalService
         await timeoutController.DisposeAsync();
 
         return response;
+    }
+
+    public void Dispose()
+    {        
+        RequestQueueController.Busy = false;
     }
 }

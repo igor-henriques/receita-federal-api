@@ -8,17 +8,18 @@ public static class ReceitaFederalEndpoints
             [FromQuery] string cpf, 
             [FromQuery] string dtNascimento,
             [FromQuery] string token,
-            [FromServices] IReceitaFederalService receitaService,
-            CancellationToken cancellationToken) =>
+            [FromServices] IReceitaFederalService receitaService) =>
         {            
             var validationResponse = ValidateChamadaReceitaFederal.Validate(cpf, dtNascimento, token);
 
             if (validationResponse.Any())
                 return Results.BadRequest(string.Join("\n", validationResponse));
 
-            SituacaoCadastralRequest request = new(cpf, DateTime.Parse(dtNascimento));
+            RequestQueueController.RequestsQueue.Enqueue(new(cpf, DateTime.Parse(dtNascimento)));
 
-            var situacaoCadastral = await Task.Run(async () => await receitaService.ObterSituacaoCadastral(request), cancellationToken);
+            await TaskUtils.WaitWhile(() => RequestQueueController.Busy);
+
+            SituacaoCadastralResponse situacaoCadastral = await receitaService.ObterSituacaoCadastral(RequestQueueController.RequestsQueue.Dequeue());
 
             return situacaoCadastral is null or default(SituacaoCadastralResponse) ? Results.StatusCode(499) : Results.Ok(situacaoCadastral);
         });
