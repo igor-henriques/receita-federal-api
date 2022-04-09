@@ -13,9 +13,9 @@ public class ChromeDriverFactory
         ChromeOptions options = new ChromeOptions();
         options.AddArguments(new List<string>()
         {
-            "--disable-blink-features=AutomationControlled",
-            "--disable-dev-shm-usage",
             "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-blink-features=AutomationControlled",                    
             "--disable-impl-side-painting",
             "--disable-setuid-sandbox",
             "--disable-seccomp-filter-sandbox",
