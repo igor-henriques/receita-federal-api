@@ -23,31 +23,37 @@ public class ReceitaFederalService : IReceitaFederalService
         webContext = null;
     }
 
-    public async ValueTask<SituacaoCadastralResponse> ObterSituacaoCadastral(SituacaoCadastralRequest request)
+    public async ValueTask<SituacaoCadastralResponse> ObterSituacaoCadastral(SituacaoCadastralRequest request, CancellationToken token)
     {
         try
         {
-            this.timeoutController = new Timer((obj) => TimeoutSafetyVerifier(), null, 15_000, Timeout.Infinite);
+            this.timeoutController = new Timer((obj) => TimeoutSafetyVerifier(), null, 14_000, Timeout.Infinite);
 
             webContext = webContext ?? webContextFactory.GetWebRepository();
 
-            await CompleteFields(request);
+            await token.Run(CompleteFields(request));
 
-            await ResolveCaptcha();
+            await token.Run(ResolveCaptcha());
 
-            await ClickSubmit();
+            await token.Run(ClickSubmit());
 
-            WaitForResultPageLoad();
+            await token.Run(WaitForResultPageLoad());
 
-            var response = await ObterDados();
+            SituacaoCadastralResponse response = await token.Run<SituacaoCadastralResponse>(ObterDados());
 
             webContext.DisposeDriver();
 
             return response;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogCritical(ex.ToString());
+
+            token.ThrowIfCancellationRequested();
 
             throw;
         }
@@ -83,7 +89,7 @@ public class ReceitaFederalService : IReceitaFederalService
         catch (Exception e) { logger.LogCritical(e.ToString()); }
     }
 
-    private void WaitForResultPageLoad()
+    private async Task WaitForResultPageLoad()
     {
         try
         {

@@ -10,9 +10,9 @@ public class WebRepository : IWebRepository, IDisposable
     {
         this._driver = driverFactory.GetChromeDriver();
 
-        this._driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(7);
+        this._driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(5);
 
-        this._wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(7));
+        this._wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(5));
 
         this._wait.IgnoreExceptionTypes(typeof(NoSuchElementException), typeof(ElementNotVisibleException));
     }

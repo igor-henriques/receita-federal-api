@@ -2,5 +2,5 @@
 
 public interface IReceitaFederalService
 {
-    ValueTask<SituacaoCadastralResponse> ObterSituacaoCadastral(SituacaoCadastralRequest request);
+    ValueTask<SituacaoCadastralResponse> ObterSituacaoCadastral(SituacaoCadastralRequest request, CancellationToken token);
 }
