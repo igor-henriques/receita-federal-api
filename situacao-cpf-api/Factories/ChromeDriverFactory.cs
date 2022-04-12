@@ -1,13 +1,19 @@
-﻿namespace situacao_cpf_api.Factories;
+﻿using Microsoft.Extensions.Options;
+
+namespace situacao_cpf_api.Factories;
 
 public class ChromeDriverFactory
 {
+    private readonly IOptions<Configuration> configuration;
+
+    public ChromeDriverFactory(IOptions<Configuration> configuration)
+    {
+        this.configuration = configuration;
+    }
+
     public ChromeDriver GetChromeDriver()
     {
-        string userDataDir = Environment.GetEnvironmentVariable("USER_DATA_DIR");
-        string driverPath = Environment.GetEnvironmentVariable("CHROMEDRIVER_PATH");
-
-        ChromeDriverService driverService = driverPath is null ? ChromeDriverService.CreateDefaultService() : ChromeDriverService.CreateDefaultService(driverPath);
+        ChromeDriverService driverService = ChromeDriverService.CreateDefaultService(configuration.Value.DriverPath);
 
         driverService.HideCommandPromptWindow = true;
 
@@ -33,15 +39,14 @@ public class ChromeDriverFactory
             "--start-minimized"
         });
 
-        if (!string.IsNullOrEmpty(userDataDir))
-            options.AddArgument($"user-data-dir={userDataDir}");
-
         options.AddExcludedArgument("enable-automation");
         options.AddExcludedArgument("--headless");
 
         options.AddAdditionalOption("useAutomationExtension", false);
 
-        options.BinaryLocation = Environment.GetEnvironmentVariable("GOOGLE_CHROME_BIN");
+        if (configuration.Value.ChromePath.Trim().Length > 1)
+            options.BinaryLocation = configuration.Value.ChromePath;
+
         options.AddExtension(Path.Combine(Directory.GetCurrentDirectory(), "hcaptcha-solver.crx"));
         options.AddExtension(Path.Combine(Directory.GetCurrentDirectory(), "cssblock.crx"));
         options.AddExtension(Path.Combine(Directory.GetCurrentDirectory(), "blockimage.crx"));

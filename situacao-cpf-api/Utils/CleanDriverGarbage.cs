@@ -21,14 +21,5 @@ public class CleanDriverGarbage
             }
             catch { }
         }
-
-        foreach (Process instance in Process.GetProcessesByName("conhost"))
-        {
-            try
-            {
-                instance.Kill();
-            }
-            catch { }
-        }
     }
 }

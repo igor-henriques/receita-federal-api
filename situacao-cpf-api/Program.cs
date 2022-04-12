@@ -5,6 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
+builder.Services.Configure<Configuration>(builder.Configuration.GetSection("Configuration"));
 builder.Services.AddSingleton<ChromeDriverFactory>();
 builder.Services.AddSingleton<WebRepositoryFactory>();
 builder.Services.AddScoped<IWebRepository, WebRepository>();
@@ -28,4 +29,4 @@ app.UseHttpsRedirection();
 
 app.ConfigurarReceitaFederalEndpoints();
 
-app.Run();
+app.Run(); 
