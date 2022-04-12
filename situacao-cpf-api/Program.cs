@@ -25,7 +25,7 @@ app.UseCors(x => x.AllowAnyHeader()
                   .AllowAnyOrigin()
                   .AllowAnyMethod());
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.ConfigurarReceitaFederalEndpoints();
 
